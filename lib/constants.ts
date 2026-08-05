@@ -17,37 +17,14 @@ export const STORAGE_KEYS = {
   theme: "game-backlog-tracker:theme",
 } as const;
 
-interface StatusMeta {
-  description: string;
-  icon: LucideIcon;
-}
-
-export const STATUS_META: Record<GameStatus, StatusMeta> = {
-  "Not Started": {
-    description: "On the radar, not yet booted up",
-    icon: CircleDashed,
-  },
-  "In Progress": {
-    description: "Currently being played",
-    icon: Timer,
-  },
-  Completed: {
-    description: "Finished — credits rolled",
-    icon: CircleCheck,
-  },
-  Dropped: {
-    description: "Set aside, maybe forever",
-    icon: CircleOff,
-  },
+export const STATUS_META: Record<GameStatus, { description: string; icon: LucideIcon }> = {
+  "Not Started": { description: "On the radar, not yet booted up", icon: CircleDashed },
+  "In Progress": { description: "Currently being played", icon: Timer },
+  Completed: { description: "Finished — credits rolled", icon: CircleCheck },
+  Dropped: { description: "Set aside, maybe forever", icon: CircleOff },
 };
 
-interface PlatformMeta {
-  icon: LucideIcon;
-  /** Accent hue used for the platform badge. */
-  accent: string;
-}
-
-export const PLATFORM_META: Record<Platform, PlatformMeta> = {
+export const PLATFORM_META: Record<Platform, { icon: LucideIcon; accent: string }> = {
   PC: { icon: Monitor, accent: "text-sky-500" },
   PS5: { icon: Gamepad2, accent: "text-indigo-400" },
   Xbox: { icon: Joystick, accent: "text-emerald-500" },

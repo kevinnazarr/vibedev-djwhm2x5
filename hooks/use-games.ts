@@ -2,12 +2,7 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { loadGames, saveGames } from "@/lib/storage";
-import {
-  GAME_STATUSES,
-  type Game,
-  type GameStatus,
-  type Platform,
-} from "@/types/game";
+import { GAME_STATUSES, type Game, type GameStatus, type Platform } from "@/types/game";
 
 export interface GameCounts {
   total: number;
@@ -21,20 +16,8 @@ function createId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/**
- * Module-level external store backed by localStorage.
- * Synchronizes the collection, persists on every mutation, and notifies
- * subscribers — no setState-in-effect, hydration-safe via server snapshot.
- */
 let gamesCache: Game[] | null = null;
 const listeners = new Set<() => void>();
-
-function readGames(): Game[] {
-  if (gamesCache === null) {
-    gamesCache = loadGames();
-  }
-  return gamesCache;
-}
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
@@ -44,72 +27,47 @@ function subscribe(listener: () => void): () => void {
 }
 
 function getSnapshot(): Game[] | null {
-  return typeof window === "undefined" ? null : readGames();
-}
-
-function getServerSnapshot(): Game[] | null {
-  return null;
+  return typeof window === "undefined" ? null : (gamesCache ??= loadGames());
 }
 
 function commit(games: Game[]): void {
   gamesCache = games;
   saveGames(games);
-  for (const listener of listeners) {
-    listener();
-  }
+  listeners.forEach((listener) => listener());
 }
 
-/**
- * Single source of truth for the game collection.
- * Owns all localStorage reads/writes so components never touch storage directly.
- */
 export function useGames() {
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const games = useMemo(() => snapshot ?? [], [snapshot]);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => null);
 
-  const addGame = useCallback(
-    (input: { title: string; platform: Platform; status: GameStatus }) => {
-      const game: Game = {
+  const addGame = useCallback((input: { title: string; platform: Platform; status: GameStatus }) => {
+    commit([
+      {
         id: createId(),
         title: input.title.trim(),
         platform: input.platform,
         status: input.status,
         createdAt: Date.now(),
-      };
-      commit([game, ...readGames()]);
-      return game;
-    },
-    [],
-  );
+      },
+      ...(gamesCache ?? []),
+    ]);
+  }, []);
 
   const updateStatus = useCallback((id: string, status: GameStatus) => {
-    commit(
-      readGames().map((game) =>
-        game.id === id ? { ...game, status } : game,
-      ),
-    );
+    commit((gamesCache ?? []).map((game) => (game.id === id ? { ...game, status } : game)));
   }, []);
 
   const removeGame = useCallback((id: string) => {
-    commit(readGames().filter((game) => game.id !== id));
+    commit((gamesCache ?? []).filter((game) => game.id !== id));
   }, []);
 
+  const games = useMemo(() => snapshot ?? [], [snapshot]);
   const counts = useMemo<GameCounts>(() => {
     const byStatus = Object.fromEntries(
       GAME_STATUSES.map((status) => [status, 0]),
     ) as Record<GameStatus, number>;
-    for (const game of games) {
-      byStatus[game.status] += 1;
-    }
+    for (const game of games) byStatus[game.status] += 1;
     return { total: games.length, byStatus };
   }, [games]);
 
-  return {
-    games,
-    isReady: snapshot !== null,
-    counts,
-    addGame,
-    updateStatus,
-    removeGame,
-  };
+  return { games, isReady: snapshot !== null, counts, addGame, updateStatus, removeGame };
 }
